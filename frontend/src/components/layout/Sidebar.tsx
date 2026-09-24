@@ -38,7 +38,7 @@ export function Sidebar() {
 
   const handleSwitchProfile = () => {
     logout();
-    navigate("/");
+    navigate("/login");
     setMobileOpen(false);
   };
 

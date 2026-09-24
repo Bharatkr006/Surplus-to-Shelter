@@ -10,15 +10,21 @@ import {
   Zap,
   Lock,
   CheckCircle2,
+  LogIn,
 } from "lucide-react";
 
 export function Home() {
   const navigate = useNavigate();
-  const { setRole } = useRole();
+  const { session, role } = useRole();
 
-  const handleSelectRole = (role: "donor" | "recipient" | "delivery", path: string) => {
-    setRole(role);
-    navigate(path);
+  const handleSelectRole = (selectedRole: "donor" | "recipient" | "delivery") => {
+    // If already logged in as this role, go straight to dashboard
+    if (session && role === selectedRole) {
+      navigate(`/${selectedRole}`);
+    } else {
+      // Go to common login page with role pre-selected
+      navigate(`/login?role=${selectedRole}`);
+    }
   };
 
   return (
@@ -33,15 +39,24 @@ export function Home() {
           Select Your Workspace Profile
         </h1>
         <p className="text-base sm:text-lg text-text-secondary max-w-2xl mx-auto">
-          Each stakeholder operates in an independent, dedicated dashboard. Choose your profile below to enter your isolated portal.
+          Each stakeholder operates in an independent, dedicated dashboard. Choose your profile below and enter your credentials to access your portal.
         </p>
+
+        <div className="pt-2">
+          <Link to="/login">
+            <Button variant="outline" size="sm" className="text-xs font-semibold">
+              <LogIn className="h-3.5 w-3.5 mr-1.5" />
+              Open Unified Login Page
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* 3 Isolated Portal Doors */}
       <div className="grid md:grid-cols-3 gap-6">
         {/* Profile 1: Donor Door */}
         <div
-          onClick={() => handleSelectRole("donor", "/donor")}
+          onClick={() => handleSelectRole("donor")}
           className="group cursor-pointer text-left"
         >
           <Card className="h-full border-2 border-border group-hover:border-amber-500 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-1 relative overflow-hidden bg-surface">
@@ -65,7 +80,7 @@ export function Home() {
                   Restaurants, Hostels & Caterers
                 </p>
                 <CardDescription className="text-xs mt-2 text-text-secondary">
-                  Post surplus food, trigger candidate matching, and monitor live rescue progress.
+                  Login to post surplus food, trigger candidate matching, and monitor live rescue progress.
                 </CardDescription>
               </div>
 
@@ -84,8 +99,8 @@ export function Home() {
                 </div>
               </div>
 
-              <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs py-2.5 mt-2">
-                Enter Donor Dashboard →
+              <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs py-2.5 mt-2 cursor-pointer">
+                Login as Donor →
               </Button>
             </CardHeader>
           </Card>
@@ -93,7 +108,7 @@ export function Home() {
 
         {/* Profile 2: Recipient Door */}
         <div
-          onClick={() => handleSelectRole("recipient", "/recipient")}
+          onClick={() => handleSelectRole("recipient")}
           className="group cursor-pointer text-left"
         >
           <Card className="h-full border-2 border-border group-hover:border-emerald-500 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-1 relative overflow-hidden bg-surface">
@@ -117,7 +132,7 @@ export function Home() {
                   Shelters, NGOs & Kitchens
                 </p>
                 <CardDescription className="text-xs mt-2 text-text-secondary">
-                  Manage shelter capacity, configure food categories, and confirm incoming rescued food.
+                  Login to manage shelter capacity, configure food categories, and confirm incoming rescued food.
                 </CardDescription>
               </div>
 
@@ -136,8 +151,8 @@ export function Home() {
                 </div>
               </div>
 
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2.5 mt-2">
-                Enter Recipient Dashboard →
+              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2.5 mt-2 cursor-pointer">
+                Login as Recipient →
               </Button>
             </CardHeader>
           </Card>
@@ -145,7 +160,7 @@ export function Home() {
 
         {/* Profile 3: Delivery Door */}
         <div
-          onClick={() => handleSelectRole("delivery", "/delivery")}
+          onClick={() => handleSelectRole("delivery")}
           className="group cursor-pointer text-left"
         >
           <Card className="h-full border-2 border-border group-hover:border-blue-500 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-1 relative overflow-hidden bg-surface">
@@ -169,7 +184,7 @@ export function Home() {
                   Drivers & Volunteer Logistics
                 </p>
                 <CardDescription className="text-xs mt-2 text-text-secondary">
-                  Accept rescue tasks, navigate pickup to shelter dropoff, and update mission status.
+                  Login to accept rescue tasks, navigate pickup to shelter dropoff, and update mission status.
                 </CardDescription>
               </div>
 
@@ -188,8 +203,8 @@ export function Home() {
                 </div>
               </div>
 
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 mt-2">
-                Enter Delivery Dashboard →
+              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 mt-2 cursor-pointer">
+                Login as Driver →
               </Button>
             </CardHeader>
           </Card>

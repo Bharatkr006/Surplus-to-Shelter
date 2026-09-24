@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { RoleProvider } from "./context/RoleContext";
 import { Home } from "./pages/Home";
+import { LoginPage } from "./pages/auth/LoginPage";
 import { DonorDashboard } from "./pages/donor/DonorDashboard";
 import { PostDonation } from "./pages/donor/PostDonation";
 import { NgoDashboard } from "./pages/ngo/NgoDashboard";
@@ -17,8 +18,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<AppLayout />}>
-            {/* Landing & Role Selection Portal */}
+            {/* Common Gateway & Login Portals */}
             <Route path="/" element={<Home />} />
+            <Route path="/login" element={<LoginPage />} />
 
             {/* 1. SEPARATE DONOR DASHBOARD (Strictly isolated) */}
             <Route path="/donor" element={<DonorDashboard />} />
