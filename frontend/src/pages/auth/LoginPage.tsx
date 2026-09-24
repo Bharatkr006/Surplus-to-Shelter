@@ -14,7 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Card, Button, Input, Select } from "../../components/ui";
-import { useRole, UserRole } from "../../context/RoleContext";
+import { useRole, type UserRole } from "../../context/RoleContext";
 
 export function LoginPage() {
   const navigate = useNavigate();
