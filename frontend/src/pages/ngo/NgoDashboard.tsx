@@ -4,7 +4,6 @@ import {
   Building2,
   Settings,
   CheckCircle2,
-  Package,
   Clock,
   MapPin,
   Users,
@@ -15,6 +14,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, Button, Badge, LoadingSpinner, EmptyState } from "../../components/ui";
+import { subscribeDataUpdated, notifyDataUpdated } from "../../lib/realtime";
 
 function formatTimeRemaining(safeUntilISO: string) {
   if (!safeUntilISO) return "—";
@@ -37,19 +37,20 @@ export function NgoDashboard() {
   const [updatingCapacity, setUpdatingCapacity] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-  // Load all organizations for the switcher
-  const loadOrganizations = async () => {
+  // Load all organizations
+  const loadOrganizations = async (preserveSelected = true) => {
     try {
       const res = await fetch("/api/organizations/");
       const data = await res.json();
       const list = data.organizations || [];
       setOrganizations(list);
 
-      // Default to Annapurna or the first org
-      const defaultOrg = list.find((o: any) => o.name.includes("Annapurna")) || list[0];
-      if (defaultOrg && !selectedOrgId) {
-        setSelectedOrgId(defaultOrg.id);
-        fetchOrgData(defaultOrg.id);
+      if (list.length > 0) {
+        const targetId = (preserveSelected && selectedOrgId) ? selectedOrgId : list[0].id;
+        setSelectedOrgId(targetId);
+        fetchOrgData(targetId);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error(err);
@@ -58,7 +59,7 @@ export function NgoDashboard() {
   };
 
   const fetchOrgData = async (orgId: string) => {
-    setLoading(true);
+    if (!orgId) return;
     try {
       const res = await fetch(`/api/organizations/${orgId}/matches`);
       if (!res.ok) throw new Error();
@@ -73,11 +74,23 @@ export function NgoDashboard() {
   };
 
   useEffect(() => {
-    loadOrganizations();
-  }, []);
+    loadOrganizations(false);
+
+    // Subscribe to cross-tab updates and real-time polling
+    const unsubscribe = subscribeDataUpdated(() => {
+      if (selectedOrgId) {
+        fetchOrgData(selectedOrgId);
+      } else {
+        loadOrganizations(true);
+      }
+    }, 3000);
+
+    return () => unsubscribe();
+  }, [selectedOrgId]);
 
   const handleOrgChange = (newOrgId: string) => {
     setSelectedOrgId(newOrgId);
+    setLoading(true);
     fetchOrgData(newOrgId);
   };
 
@@ -94,6 +107,7 @@ export function NgoDashboard() {
       if (res.ok) {
         const updated = await res.json();
         setOrg(updated);
+        notifyDataUpdated();
       }
     } catch (err) {
       console.error(err);
@@ -117,6 +131,7 @@ export function NgoDashboard() {
       if (res.ok) {
         const updated = await res.json();
         setOrg(updated);
+        notifyDataUpdated();
       }
     } catch (err) {
       console.error(err);
@@ -135,8 +150,8 @@ export function NgoDashboard() {
         body: JSON.stringify({ status: "DELIVERED" }),
       });
       if (res.ok) {
-        // Refresh org data
         await fetchOrgData(org.id);
+        notifyDataUpdated();
       } else {
         const err = await res.json();
         alert(err.error || "Failed to update delivery status");
@@ -165,7 +180,7 @@ export function NgoDashboard() {
       {/* Profile Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-6 rounded-2xl border border-border shadow-xs">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-emerald-600/10 border border-emerald-600/20 flex items-center justify-center text-emerald-600">
+          <div className="h-14 w-14 rounded-2xl bg-emerald-600/10 border border-emerald-600/20 flex items-center justify-center text-emerald-600 shrink-0">
             <Building2 className="h-7 w-7" />
           </div>
           <div>
@@ -176,7 +191,7 @@ export function NgoDashboard() {
               </span>
             </div>
             <p className="text-text-secondary text-sm mt-0.5">
-              Manage shelter capacity, configure food acceptance criteria, and accept inbound rescued meals.
+              Manage shelter capacity in real time, set food acceptance criteria, and accept inbound rescued meals.
             </p>
           </div>
         </div>
@@ -184,7 +199,7 @@ export function NgoDashboard() {
         {/* Shelter Switcher Dropdown */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="bg-surface-alt border border-border rounded-xl px-3 py-1.5 flex items-center gap-2">
-            <span className="text-xs font-semibold text-text-muted">Viewing Shelter:</span>
+            <span className="text-xs font-semibold text-text-muted">Active Shelter:</span>
             <select
               value={selectedOrgId}
               onChange={(e) => handleOrgChange(e.target.value)}
@@ -245,27 +260,27 @@ export function NgoDashboard() {
                     style={{ width: `${capacityPct}%` }}
                   />
                 </div>
-                {/* Quick Capacity Adjuster Buttons */}
+                {/* Real-time Capacity Adjuster */}
                 <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-border/60">
-                  <span className="text-[11px] text-text-muted mr-1">Quick:</span>
+                  <span className="text-[11px] text-text-muted mr-1">Adjust:</span>
                   <button
                     disabled={updatingCapacity}
                     onClick={() => handleAdjustCapacity(-10)}
-                    className="px-2 py-0.5 text-xs rounded bg-surface-alt hover:bg-surface-alt/80 border border-border text-text font-mono"
+                    className="px-2 py-0.5 text-xs rounded bg-surface-alt hover:bg-surface-alt/80 border border-border text-text font-mono cursor-pointer"
                   >
                     -10
                   </button>
                   <button
                     disabled={updatingCapacity}
                     onClick={() => handleAdjustCapacity(10)}
-                    className="px-2 py-0.5 text-xs rounded bg-surface-alt hover:bg-surface-alt/80 border border-border text-text font-mono"
+                    className="px-2 py-0.5 text-xs rounded bg-surface-alt hover:bg-surface-alt/80 border border-border text-text font-mono cursor-pointer"
                   >
                     +10
                   </button>
                   <button
                     disabled={updatingCapacity}
                     onClick={() => handleAdjustCapacity(40)}
-                    className="px-2 py-0.5 text-xs rounded bg-surface-alt hover:bg-surface-alt/80 border border-border text-text font-mono"
+                    className="px-2 py-0.5 text-xs rounded bg-surface-alt hover:bg-surface-alt/80 border border-border text-text font-mono cursor-pointer"
                   >
                     +40
                   </button>
@@ -353,7 +368,7 @@ export function NgoDashboard() {
                 description={`When donors post food compatible with ${org.name}, the matching algorithm will dispatch them here.`}
                 action={
                   <Link to="/donor/post">
-                    <Button size="sm">Post Food as Donor to Test</Button>
+                    <Button size="sm">Post Surplus Food to Match</Button>
                   </Link>
                 }
               />
@@ -477,7 +492,7 @@ export function NgoDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold text-emerald-700">Delivered & Consumed</span>
+                      <span className="text-xs font-semibold text-emerald-700">Delivered & Received</span>
                       <Link to={`/track/${m.donation_id}`}>
                         <Button variant="outline" size="sm" className="text-xs">
                           Tracking Log

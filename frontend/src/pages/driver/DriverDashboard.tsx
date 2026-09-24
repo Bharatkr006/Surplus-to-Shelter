@@ -6,16 +6,14 @@ import {
   Navigation,
   Clock,
   MapPin,
-  ArrowRight,
   Package,
   Phone,
   Power,
   RefreshCw,
   ExternalLink,
-  ChevronRight,
-  ShieldCheck,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, Button, Badge, LoadingSpinner, EmptyState } from "../../components/ui";
+import { Card, Button, Badge, LoadingSpinner, EmptyState } from "../../components/ui";
+import { subscribeDataUpdated, notifyDataUpdated } from "../../lib/realtime";
 
 function formatTimeRemaining(safeUntilISO: string) {
   if (!safeUntilISO) return "—";
@@ -43,14 +41,15 @@ export function DriverDashboard() {
       const list = data.drivers || [];
       setDrivers(list);
 
-      // Default to Mohammed Ali or Alex Kumar or first driver
-      if (!selectedDriverId && list.length > 0) {
-        const preferred = list.find((d: any) => d.name.includes("Mohammed") || d.name.includes("Alex")) || list[0];
-        setSelectedDriverId(preferred.id);
-        setCurrentDriver(preferred);
-      } else if (selectedDriverId) {
-        const found = list.find((d: any) => d.id === selectedDriverId);
-        if (found) setCurrentDriver(found);
+      if (list.length > 0) {
+        if (!selectedDriverId) {
+          const preferred = list[0];
+          setSelectedDriverId(preferred.id);
+          setCurrentDriver(preferred);
+        } else {
+          const found = list.find((d: any) => d.id === selectedDriverId);
+          if (found) setCurrentDriver(found);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -72,7 +71,15 @@ export function DriverDashboard() {
   useEffect(() => {
     fetchDrivers();
     fetchDeliveries();
-  }, []);
+
+    // Subscribe to cross-dashboard and cross-tab events + 3s safety polling
+    const unsubscribe = subscribeDataUpdated(() => {
+      fetchDrivers();
+      fetchDeliveries();
+    }, 3000);
+
+    return () => unsubscribe();
+  }, [selectedDriverId]);
 
   const handleDriverChange = (driverId: string) => {
     setSelectedDriverId(driverId);
@@ -96,6 +103,7 @@ export function DriverDashboard() {
         const updated = await res.json();
         setCurrentDriver(updated);
         await fetchDrivers();
+        notifyDataUpdated();
       }
     } catch (err) {
       console.error(err);
@@ -114,6 +122,7 @@ export function DriverDashboard() {
       if (res.ok) {
         await fetchDeliveries();
         await fetchDrivers();
+        notifyDataUpdated();
       } else {
         const err = await res.json();
         alert(err.error || "Pickup failed");
@@ -135,6 +144,7 @@ export function DriverDashboard() {
       if (res.ok) {
         await fetchDeliveries();
         await fetchDrivers();
+        notifyDataUpdated();
       } else {
         const err = await res.json();
         alert(err.error || "Delivery update failed");
@@ -159,6 +169,7 @@ export function DriverDashboard() {
       if (res.ok) {
         await fetchDeliveries();
         await fetchDrivers();
+        notifyDataUpdated();
       } else {
         const err = await res.json();
         alert(err.error || "Claim failed");
@@ -190,7 +201,7 @@ export function DriverDashboard() {
       {/* Profile Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-6 rounded-2xl border border-border shadow-xs">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-blue-600">
+          <div className="h-14 w-14 rounded-2xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-blue-600 shrink-0">
             <Truck className="h-7 w-7" />
           </div>
           <div>
@@ -201,7 +212,7 @@ export function DriverDashboard() {
               </span>
             </div>
             <p className="text-text-secondary text-sm mt-0.5">
-              Pickup donor surplus, navigate optimal road routes via OSRM, and deliver to recipient shelters.
+              Pickup donor surplus, navigate optimal road routes, and deliver to recipient shelters in real time.
             </p>
           </div>
         </div>
@@ -227,7 +238,7 @@ export function DriverDashboard() {
             <Button
               size="sm"
               variant={currentDriver.is_available ? "outline" : "primary"}
-              className={currentDriver.is_available ? "text-danger-600 border-danger-200" : "bg-blue-600"}
+              className={currentDriver.is_available ? "text-danger-600 border-danger-200 cursor-pointer" : "bg-blue-600 cursor-pointer"}
               loading={actionLoading === "toggle-status"}
               onClick={handleToggleOnline}
             >
@@ -329,7 +340,7 @@ export function DriverDashboard() {
                     <span>Active Route: {activeMission.donation_quantity} {activeMission.donation_unit} of {activeMission.donation_food_type}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span>OSRM Road Dist: <strong>{activeMission.distance_km} km</strong></span>
+                    <span>Road Distance: <strong>{activeMission.distance_km} km</strong></span>
                     <span>•</span>
                     <span>ETA: <strong>{activeMission.estimated_minutes} mins</strong></span>
                   </div>
@@ -406,14 +417,14 @@ export function DriverDashboard() {
                   <div className="pt-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
                     <Link to={`/track/${activeMission.donation_id}`}>
                       <Button variant="outline" size="sm" className="text-xs">
-                        Open Live Route & Leaflet Map <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                        Open Live Route & Route Map <ExternalLink className="h-3.5 w-3.5 ml-1" />
                       </Button>
                     </Link>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       {["MATCHED", "DRIVER_ASSIGNED"].includes(activeMission.donation_status) && (
                         <Button
-                          className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs py-2 px-5"
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs py-2 px-5 cursor-pointer"
                           loading={actionLoading === `pickup-${activeMission.id}`}
                           onClick={() => handlePickup(activeMission.id)}
                         >
@@ -424,7 +435,7 @@ export function DriverDashboard() {
 
                       {activeMission.donation_status === "PICKED_UP" && (
                         <Button
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 px-5"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 px-5 cursor-pointer"
                           loading={actionLoading === `deliver-${activeMission.id}`}
                           onClick={() => handleDeliver(activeMission.id)}
                         >
@@ -439,7 +450,7 @@ export function DriverDashboard() {
             ) : (
               <EmptyState
                 title="No active delivery assigned to this driver"
-                description={`${currentDriver?.name || "Driver"} is currently available for dispatch. Check unassigned rescues below or select another driver.`}
+                description={`${currentDriver?.name || "Driver"} is available for dispatch. Once a donation is matched and assigned, it will appear here automatically.`}
               />
             )}
           </div>
@@ -474,7 +485,7 @@ export function DriverDashboard() {
                     <div className="mt-4 pt-3 border-t border-border flex justify-end">
                       <Button
                         size="sm"
-                        className="bg-blue-600 text-xs"
+                        className="bg-blue-600 text-xs cursor-pointer"
                         loading={actionLoading === `claim-${delivery.id}`}
                         onClick={() => handleClaim(delivery.id)}
                       >

@@ -1,4 +1,4 @@
-import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { useRole } from "../../context/RoleContext";
 import { UtensilsCrossed, Building2, Truck, LogOut, Shield } from "lucide-react";
@@ -6,7 +6,7 @@ import { UtensilsCrossed, Building2, Truck, LogOut, Shield } from "lucide-react"
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { role, logout, setRole } = useRole();
+  const { role, logout } = useRole();
 
   // If on landing / role selector page
   const isHomePage = location.pathname === "/";
@@ -29,24 +29,24 @@ export function AppLayout() {
     switch (currentRole) {
       case "donor":
         return {
-          title: "Donor Account",
-          entity: "SKIT Campus Kitchen (Jaipur)",
+          title: "Donor Portal",
+          entity: "Food Provider Session",
           badge: "bg-amber-100 text-amber-800 border-amber-200",
           icon: UtensilsCrossed,
           iconColor: "text-amber-600",
         };
       case "recipient":
         return {
-          title: "Recipient Shelter Account",
-          entity: "Annapurna Community Kitchen",
+          title: "Recipient Portal",
+          entity: "NGO & Shelter Beneficiary",
           badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
           icon: Building2,
           iconColor: "text-emerald-600",
         };
       case "delivery":
         return {
-          title: "Delivery Driver Account",
-          entity: "Mohammed Ali (Van Fleet)",
+          title: "Delivery Fleet",
+          entity: "Driver Logistics Command",
           badge: "bg-blue-100 text-blue-800 border-blue-200",
           icon: Truck,
           iconColor: "text-blue-600",
@@ -87,7 +87,7 @@ export function AppLayout() {
             <div className="flex items-center gap-3">
               <span className="text-xs text-text-muted flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Isolated Dashboard
+                Live Real-Time Sync
               </span>
 
               <button

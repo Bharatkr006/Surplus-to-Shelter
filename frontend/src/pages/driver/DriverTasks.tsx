@@ -1,20 +1,29 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Clock, MapPin, Package, CheckCircle2, Truck } from "lucide-react";
+import { ArrowLeft, Clock, Package, CheckCircle2, Truck } from "lucide-react";
 import { Card, Badge, LoadingSpinner, EmptyState, Button } from "../../components/ui";
+import { subscribeDataUpdated } from "../../lib/realtime";
 
 export function DriverTasks() {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchDeliveries = async () => {
+    try {
+      const res = await fetch("/api/deliveries/");
+      const data = await res.json();
+      setDeliveries(data.deliveries || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch("/api/deliveries/")
-      .then((r) => r.json())
-      .then((data) => {
-        setDeliveries(data.deliveries || []);
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+    fetchDeliveries();
+    const unsubscribe = subscribeDataUpdated(fetchDeliveries, 3000);
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -25,7 +34,7 @@ export function DriverTasks() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-text">Fleet Mission Log</h1>
-          <p className="text-text-secondary text-sm">All dispatched food rescue deliveries and routes</p>
+          <p className="text-text-secondary text-sm">All real-time food rescue deliveries and verified routes</p>
         </div>
       </div>
 
@@ -36,7 +45,7 @@ export function DriverTasks() {
       ) : deliveries.length === 0 ? (
         <EmptyState
           title="No rescue missions logged yet"
-          description="When matches are formed and drivers assigned, delivery tasks will appear here."
+          description="When matches are formed and drivers assigned, delivery tasks will appear here automatically."
           action={
             <Link to="/donor">
               <Button size="sm">Go to Donor Dashboard</Button>

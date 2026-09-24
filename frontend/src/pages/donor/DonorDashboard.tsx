@@ -14,8 +14,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Card, Button, Badge, LoadingSpinner, EmptyState } from "../../components/ui";
+import { subscribeDataUpdated, notifyDataUpdated } from "../../lib/realtime";
 
 function formatTimeRemaining(safeUntilISO: string) {
+  if (!safeUntilISO) return "—";
   const safeUntil = new Date(safeUntilISO).getTime();
   const now = new Date().getTime();
   const diff = safeUntil - now;
@@ -28,7 +30,7 @@ function formatTimeRemaining(safeUntilISO: string) {
 function getStatusBadge(status: string) {
   switch (status) {
     case "POSTED":
-      return <Badge variant="warning">🟡 POSTED — Waiting for Match</Badge>;
+      return <Badge variant="warning">🟡 POSTED — Awaiting Match</Badge>;
     case "MATCHING":
       return <Badge variant="info">🔵 MATCHING IN PROGRESS</Badge>;
     case "MATCHED":
@@ -56,7 +58,6 @@ export function DonorDashboard() {
   const [matchingId, setMatchingId] = useState<string | null>(null);
 
   const fetchDonations = async () => {
-    setLoading(true);
     try {
       const res = await fetch("/api/donations/");
       const data = await res.json();
@@ -70,10 +71,11 @@ export function DonorDashboard() {
 
   useEffect(() => {
     fetchDonations();
-    const interval = setInterval(() => {
+    // Real-time synchronization (cross-tab broadcasts + fast 3s polling)
+    const unsubscribe = subscribeDataUpdated(() => {
       fetchDonations();
-    }, 30000);
-    return () => clearInterval(interval);
+    }, 3000);
+    return () => unsubscribe();
   }, []);
 
   const handleRunMatch = async (donationId: string) => {
@@ -85,6 +87,7 @@ export function DonorDashboard() {
         alert(err.error || "Matching failed");
       } else {
         await fetchDonations();
+        notifyDataUpdated();
       }
     } catch {
       alert("Network error during matching");
@@ -93,7 +96,7 @@ export function DonorDashboard() {
     }
   };
 
-  // KPI Calculations
+  // Real KPI Calculations purely from actual DB rows
   const totalDonations = donations.length;
   const totalPortions = donations.reduce((sum, d) => sum + (parseFloat(d.quantity) || 0), 0);
   const activeUnmatched = donations.filter((d) => d.status === "POSTED" || d.status === "MATCHING").length;
@@ -113,7 +116,7 @@ export function DonorDashboard() {
       {/* Profile Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-6 rounded-2xl border border-border shadow-xs">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600">
+          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
             <UtensilsCrossed className="h-7 w-7" />
           </div>
           <div>
@@ -124,27 +127,12 @@ export function DonorDashboard() {
               </span>
             </div>
             <p className="text-text-secondary text-sm mt-0.5">
-              List surplus food, run multi-factor matching algorithms, and track food rescue to shelters.
+              List surplus food, run multi-factor matching algorithms, and track food rescue to shelters in real time.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 text-xs font-semibold"
-            title="Reset to deterministic demo baseline (40 portions, Annapurna viable, Hope Shelter cap=15)"
-            onClick={async () => {
-              if (confirm("Reset demo data to deterministic baseline?")) {
-                const res = await fetch("/api/demo/reset", { method: "POST" });
-                if (res.ok) await fetchDonations();
-              }
-            }}
-          >
-            Reset Demo Data
-          </Button>
-
           <Button variant="outline" size="sm" onClick={fetchDonations} title="Refresh listings">
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -164,7 +152,7 @@ export function DonorDashboard() {
         </div>
       )}
 
-      {/* KPI Stats Row */}
+      {/* KPI Stats Row from Real DB Data */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface p-4 rounded-xl border border-border">
           <div className="flex items-center justify-between">
@@ -177,7 +165,7 @@ export function DonorDashboard() {
 
         <div className="bg-surface p-4 rounded-xl border border-border">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-text-muted uppercase">Need Matching</span>
+            <span className="text-xs font-semibold text-text-muted uppercase">Awaiting Match</span>
             <AlertCircle className="h-4 w-4 text-amber-500" />
           </div>
           <p className="text-2xl font-bold text-amber-600 mt-2">{activeUnmatched}</p>
@@ -215,7 +203,7 @@ export function DonorDashboard() {
             <button
               key={id}
               onClick={() => setFilter(id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 filter === id
                   ? "bg-primary-50 text-primary-700 font-semibold"
                   : "text-text-secondary hover:bg-surface-alt"
@@ -227,7 +215,7 @@ export function DonorDashboard() {
         </div>
       </div>
 
-      {/* Donation Cards */}
+      {/* Donation Cards List */}
       {loading ? (
         <div className="py-16 flex justify-center">
           <LoadingSpinner />
@@ -235,7 +223,11 @@ export function DonorDashboard() {
       ) : filteredDonations.length === 0 ? (
         <EmptyState
           title="No food listings found"
-          description={`No donations match the '${filter}' filter.`}
+          description={
+            donations.length === 0
+              ? "You haven't posted any surplus food yet. Create your first donation to begin matching with shelters."
+              : `No donations match the '${filter}' filter.`
+          }
           action={
             <Link to="/donor/post">
               <Button>Post Food Donation</Button>

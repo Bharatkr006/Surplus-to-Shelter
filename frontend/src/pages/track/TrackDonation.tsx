@@ -5,6 +5,7 @@ import {
   XCircle, Star, Truck, ChevronDown, ChevronUp, Zap, AlertTriangle, RefreshCw
 } from "lucide-react";
 import { Card, Badge, LoadingSpinner, EmptyState, Button } from "../../components/ui";
+import { subscribeDataUpdated, notifyDataUpdated } from "../../lib/realtime";
 
 function formatTimeRemaining(safeUntilISO: string) {
   if (!safeUntilISO) return "—";
@@ -165,7 +166,7 @@ export function TrackDonation() {
   const [loading, setLoading] = useState(true);
   const [matchLoading, setMatchLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [showRejected, setShowRejected] = useState(true); // Open by default for judge demonstration
+  const [showRejected, setShowRejected] = useState(true);
   const [runMatchError, setRunMatchError] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -193,8 +194,8 @@ export function TrackDonation() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 15000);
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeDataUpdated(fetchData, 3000);
+    return () => unsubscribe();
   }, [id]);
 
   const handleRunMatching = async () => {
@@ -205,6 +206,7 @@ export function TrackDonation() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Matching failed");
       await fetchData();
+      notifyDataUpdated();
     } catch (err: any) {
       setRunMatchError(err.message || "Matching failed");
     } finally {
@@ -270,7 +272,7 @@ export function TrackDonation() {
         </Button>
       </div>
 
-      {location.search.includes("just_posted=true") && (
+      {location.search.includes("just_posted=true") && donation.status === "POSTED" && (
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
@@ -279,7 +281,7 @@ export function TrackDonation() {
         </div>
       )}
 
-      {/* ---- MATCH RESULT SECTION (Kept visible across MATCHED, PICKED_UP, DELIVERED) ---- */}
+      {/* ---- MATCH RESULT SECTION (Visible across MATCHED, PICKED_UP, DELIVERED) ---- */}
       {hasMatchData && (
         <Card className="border-2 border-emerald-500/30 shadow-md overflow-hidden">
           {/* Header Bar */}
@@ -359,7 +361,7 @@ export function TrackDonation() {
               </div>
             </div>
 
-            {/* WHY THIS MATCH? (Explanation Checklist) */}
+            {/* WHY THIS MATCH? */}
             <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4.5">
               <h3 className="font-bold text-sm text-emerald-900 mb-2.5 flex items-center gap-2">
                 <Star className="w-4 h-4 text-emerald-600 fill-emerald-600" />
@@ -424,7 +426,7 @@ export function TrackDonation() {
         </Card>
       )}
 
-      {/* ---- WHY NOT OTHER RECIPIENTS? (Judge USP Section) ---- */}
+      {/* ---- WHY NOT OTHER RECIPIENTS? ---- */}
       {selectedMatch && (
         <div className="space-y-3">
           <Card className="border border-border">
@@ -476,7 +478,7 @@ export function TrackDonation() {
 
                       <div className="text-right shrink-0">
                         <span className="text-[11px] font-semibold text-danger-700 bg-white px-2.5 py-1 rounded-md border border-danger-200">
-                          {candidate.organization_name.includes("Hope") ? "Closer (2.1km) but Ineligible" : "Disqualified"}
+                          Disqualified
                         </span>
                       </div>
                     </div>
@@ -516,7 +518,7 @@ export function TrackDonation() {
             <div className="max-w-md mx-auto">
               <h3 className="font-bold text-lg text-text">Ready to Dispatch Matching Engine</h3>
               <p className="text-text-secondary text-xs mt-1">
-                Evaluate candidate shelters across Jaipur for capacity, food compatibility, expiry margin, and volunteer driver availability.
+                Evaluate candidate shelters for capacity, food compatibility, expiry margin, and volunteer driver availability.
               </p>
             </div>
             {runMatchError && (
@@ -529,7 +531,7 @@ export function TrackDonation() {
               onClick={handleRunMatching}
               loading={matchLoading}
               disabled={matchLoading}
-              className="w-full max-w-sm mx-auto bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 shadow-md"
+              className="w-full max-w-sm mx-auto bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 shadow-md cursor-pointer"
             >
               <Zap className="w-4 h-4 mr-2" />
               {matchLoading ? "Evaluating Shelters & Routing..." : "Find Best Match"}

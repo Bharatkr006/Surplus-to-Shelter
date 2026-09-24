@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Leaf, Utensils, Route, Target, RefreshCw, RotateCcw, CheckCircle2, Zap } from "lucide-react";
+import { Leaf, Utensils, Route, Target, RefreshCw } from "lucide-react";
 import { Card, CardHeader, CardTitle, Button, LoadingSpinner } from "../../components/ui";
+import { subscribeDataUpdated } from "../../lib/realtime";
 
 export function ImpactDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [resetting, setResetting] = useState(false);
-  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   const fetchImpact = async () => {
     try {
@@ -23,37 +22,15 @@ export function ImpactDashboard() {
 
   useEffect(() => {
     fetchImpact();
-    const interval = setInterval(fetchImpact, 15000);
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeDataUpdated(fetchImpact, 3000);
+    return () => unsubscribe();
   }, []);
 
-  const handleResetDemo = async () => {
-    if (!confirm("Reset database to the deterministic demo baseline (40 portions, Annapurna viable, Hope Shelter cap=15)?")) {
-      return;
-    }
-    setResetting(true);
-    setResetMessage(null);
-    try {
-      const res = await fetch("/api/demo/reset", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setResetMessage("✨ Demo successfully reset! Deterministic scenario initialized.");
-        await fetchImpact();
-      } else {
-        alert(data.error || "Reset failed");
-      }
-    } catch {
-      alert("Network error resetting demo");
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  // Dynamic chart data from actual DB state
+  // Dynamic pipeline chart from purely real DB metrics
   const chartData = [
     { name: "Posted", value: metrics?.total_donations_posted || 0, fill: "#f59e0b" },
     { name: "Matched", value: metrics?.total_matches_created || 0, fill: "#3b82f6" },
-    { name: "Active", value: metrics?.active_donations || 0, fill: "#8b5cf6" },
+    { name: "In Transit", value: metrics?.active_donations || 0, fill: "#8b5cf6" },
     { name: "Delivered", value: metrics?.successful_deliveries || 0, fill: "#10b981" },
   ];
 
@@ -65,7 +42,7 @@ export function ImpactDashboard() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-text">City-Wide Impact Analytics</h1>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-              Live Database
+              Live Real-Time Database
             </span>
           </div>
           <p className="text-text-secondary text-sm mt-0.5">
@@ -82,27 +59,8 @@ export function ImpactDashboard() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-
-          {/* Reset Demo Button for Judges */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 text-xs font-bold"
-            loading={resetting}
-            onClick={handleResetDemo}
-          >
-            <RotateCcw className="h-3.5 w-3.5 mr-1 text-amber-600" />
-            Reset Demo Baseline
-          </Button>
         </div>
       </div>
-
-      {resetMessage && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{resetMessage}</span>
-        </div>
-      )}
 
       {loading ? (
         <div className="py-20 flex justify-center">
@@ -179,7 +137,7 @@ export function ImpactDashboard() {
                     {metrics?.successful_deliveries ?? 0}
                     <span className="text-sm font-normal text-text-muted ml-1">rescues</span>
                   </div>
-                  <p className="text-xs text-text-muted mt-1">{metrics?.active_donations ?? 0} currently in progress</p>
+                  <p className="text-xs text-text-muted mt-1">{metrics?.active_donations ?? 0} currently in transit</p>
                 </div>
               </CardHeader>
             </Card>
@@ -190,7 +148,7 @@ export function ImpactDashboard() {
             <Card className="p-6">
               <CardHeader className="p-0 pb-4">
                 <CardTitle className="text-base font-bold text-text">Live Platform Pipeline Activity</CardTitle>
-                <p className="text-xs text-text-secondary">Distribution of rescues across pipeline stages</p>
+                <p className="text-xs text-text-secondary">Real distribution of rescues across active pipeline stages</p>
               </CardHeader>
               <div className="h-64 mt-2">
                 <ResponsiveContainer width="100%" height="100%">
@@ -210,16 +168,16 @@ export function ImpactDashboard() {
 
             <Card className="p-6">
               <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-base font-bold text-text">Core Matching Engine Weights</CardTitle>
-                <p className="text-xs text-text-secondary">Engineering parameters governing candidate recipient selection</p>
+                <CardTitle className="text-base font-bold text-text">Core Matching Engine Factors</CardTitle>
+                <p className="text-xs text-text-secondary">Normalized weights governing candidate recipient scoring</p>
               </CardHeader>
               <div className="space-y-3.5 mt-2 text-xs">
                 {[
-                  { factor: "Road Distance & Proximity", weight: "20%", color: "bg-blue-500", desc: "Penalizes excessive transit distance" },
-                  { factor: "Capacity Fit & Headroom", weight: "20%", color: "bg-emerald-500", desc: "Strict filter + rewards matching shelter capacity" },
-                  { factor: "Food Category Compatibility", weight: "20%", color: "bg-purple-500", desc: "Zero score if food is not in accepted list" },
-                  { factor: "Expiry Safety Window", weight: "20%", color: "bg-amber-500", desc: "Disqualifies routes exceeding safe deadline" },
-                  { factor: "Recipient Priority Need", weight: "10%", color: "bg-red-500", desc: "Boosts shelters actively seeking this category" },
+                  { factor: "Road Distance & Proximity", weight: "20%", color: "bg-blue-500", desc: "Penalizes excessive road transit distance via OSRM" },
+                  { factor: "Capacity Fit & Headroom", weight: "20%", color: "bg-emerald-500", desc: "Filter + rewards headroom above requested quantity" },
+                  { factor: "Food Category Compatibility", weight: "20%", color: "bg-purple-500", desc: "Rejection filter if food is not in accepted list" },
+                  { factor: "Expiry Safety Window", weight: "20%", color: "bg-amber-500", desc: "Disqualifies routes exceeding safe safe_until deadline" },
+                  { factor: "Recipient Priority Need", weight: "10%", color: "bg-red-500", desc: "Boosts shelters actively needing this food category" },
                   { factor: "Volunteer Driver Availability", weight: "10%", color: "bg-cyan-500", desc: "Rewards shelters with immediately dispatchable drivers" },
                 ].map((item, idx) => (
                   <div key={idx} className="space-y-1">
